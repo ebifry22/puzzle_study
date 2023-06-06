@@ -4,8 +4,8 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
-    const float TRANS_TIME = 0.05f;
-    const float ROT_TIME = 0.05f;
+    const int TRANS_TIME = 3;
+    const int ROT_TIME = 3;
 
     enum RotState
     {
@@ -27,9 +27,13 @@ public class PlayerController : MonoBehaviour
     Vector2Int _last_position;
     RotState _last_rotate = RotState.Up;
 
+    LogicalInput logicalInput = new();
+
     // Start is called before the first frame update
     void Start()
     {
+        logicalInput.Clear();
+
         _puyoControllers[0].SetPuyoType(PuyoType.Green);
         _puyoControllers[1].SetPuyoType(PuyoType.Red);
 
@@ -59,7 +63,7 @@ public class PlayerController : MonoBehaviour
         return true;
     }
 
-    void SetTransition(Vector2Int pos,RotState rot,float time)
+    void SetTransition(Vector2Int pos,RotState rot,int time)
     {
         _last_position = _position;
         _last_rotate = _rotate;
@@ -135,36 +139,67 @@ public class PlayerController : MonoBehaviour
         gameObject.SetActive(false);
     }
 
+    static readonly KeyCode[] key_code_tbl = new KeyCode[(int)LogicalInput.Key.Max] {
+        KeyCode.RightArrow, //Right
+        KeyCode.LeftArrow,  //Left
+        KeyCode.X,          //RotR
+        KeyCode.Z,          //RotL
+        KeyCode.UpArrow,    //QuickDrop
+        KeyCode.DownArrow,  //Down
+    };
+
+    void UpDateInput()
+    {
+        LogicalInput.Key inputDev = 0;
+
+        for(int i=0;i<(int)LogicalInput.Key.Max;i++)
+        {
+            if (Input.GetKey(key_code_tbl[i]))
+            {
+                inputDev |= (LogicalInput.Key)(1 << i);
+            }
+        }
+
+        logicalInput.Update(inputDev);
+    }
+
     void Control()
     {
-        if (Input.GetKeyDown(KeyCode.RightArrow))
+        //平行移動のキー入力取得
+        if (logicalInput.IsRepeat(LogicalInput.Key.Right))
         {
             if (Translate(true)) return;
         }
-        if (Input.GetKeyDown(KeyCode.LeftArrow))
+        if (logicalInput.IsRepeat(LogicalInput.Key.Left))
         {
             if (Translate(false)) return;
         }
 
-        if (Input.GetKeyDown(KeyCode.X))
+        //回転のキー入力取得
+        if (logicalInput.IsTrigger(LogicalInput.Key.RotR))//右回転
         {
             if (Rotate(true)) return;
         }
-        if (Input.GetKeyDown(KeyCode.Z))
+        if (logicalInput.IsTrigger(LogicalInput.Key.RotL))//左回転
         {
             if (Rotate(false)) return;
         }
 
-        if (Input.GetKeyDown(KeyCode.UpArrow))
+        //クイックドロップのキー入力取得
+        if (logicalInput.IsRelease(LogicalInput.Key.QuickDrop))
         {
             QuickDrop();
         }
     }
 
     // Update is called once per frame
-    void Update()
+    void FixedUpdate()
     {
-        if(!_animationController.Update(Time.deltaTime))
+        //入力を取り込む
+        UpDateInput();
+
+        //操作を受けて動かす
+        if(!_animationController.Update())
         {
             Control();
         }
