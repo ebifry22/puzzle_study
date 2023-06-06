@@ -58,13 +58,8 @@ public class PlayerController : MonoBehaviour
 
         _position = pos;
 
-        _puyoControllers[0].SetPos(new Vector3((float)_position.x, (float)_position.y, 0.0f));
-        Vector2Int posChild = CalcChildPuyoPos(_position, _rotate);
-        _puyoControllers[1].SetPos(new Vector3((float)posChild.x, (float)posChild.y, 0.0f));
-
         return true;
     }
-
 
     bool Rotate(bool is_right)
     {
@@ -96,10 +91,6 @@ public class PlayerController : MonoBehaviour
 
         _position= pos;
         _rotate = rot;
-
-        _puyoControllers[0].SetPos(new Vector3((float)_position.x, (float)_position.y, 0.0f));
-        Vector2Int posChild=CalcChildPuyoPos(_position, _rotate);
-        _puyoControllers[1].SetPos(new Vector3((float)posChild.x, posChild.y, 0.0f));
 
         return true;
     }
