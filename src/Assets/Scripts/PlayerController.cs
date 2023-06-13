@@ -4,8 +4,15 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
-    const int TRANS_TIME = 3;
-    const int ROT_TIME = 3;
+    //移動制御
+    const int TRANS_TIME = 3;//平行移動遷移時間
+    const int ROT_TIME = 3;//回転遷移時間
+    //落下制御
+    const int FALL_COUNT_UNIT = 120;//一マス落下するカウント数
+    const int FALL_COUNT_SPD = 10;//落下速度
+    const int FALL_COUNT_FAST_SPD = 20;//高速落下時の速度
+    const int GROUND_FRAMS = 50;//接地移動可能時間
+
 
     enum RotState
     {
@@ -19,15 +26,20 @@ public class PlayerController : MonoBehaviour
 
     [SerializeField] PuyoController[] _puyoControllers = new PuyoController[2] { default!, default! };
     [SerializeField] BoardController boardController = default!;
+    LogicalInput logicalInput = new();
 
-    Vector2Int _position;
+    //姿勢
+    Vector2Int _position = new Vector2Int(2, 12);
     RotState _rotate = RotState.Up;
 
+    //移動制御
     AnimationController _animationController = new AnimationController();
     Vector2Int _last_position;
     RotState _last_rotate = RotState.Up;
 
-    LogicalInput logicalInput = new();
+    //落下制御
+    int _fallCount = 0;
+    int _groundFrame = GROUND_FRAMS;
 
     // Start is called before the first frame update
     void Start()
@@ -62,9 +74,11 @@ public class PlayerController : MonoBehaviour
 
     void SetTransition(Vector2Int pos,RotState rot,int time)
     {
+        //補間のために保存
         _last_position = _position;
         _last_rotate = _rotate;
 
+        //値の更新
         _position = pos;
         _rotate = rot;
 
@@ -114,6 +128,19 @@ public class PlayerController : MonoBehaviour
         return true;
     }
 
+    void Settle()
+    {
+        bool is_set0 = boardController.Settle(_position,
+            (int)_puyoControllers[0].GetPuyoType());
+        Debug.Assert(is_set0);
+
+        bool is_set1 = boardController.Settle(CalcChildPuyoPos(_position, _rotate),
+            (int)_puyoControllers[1].GetPuyoType());
+        Debug.Assert(is_set1);
+
+        gameObject.SetActive(false);
+    }
+
     void QuickDrop()
     {
         Vector2Int pos= _position;
@@ -125,15 +152,7 @@ public class PlayerController : MonoBehaviour
 
         _position= pos;
 
-        bool is_set0 = boardController.Settle(_position,
-            (int)_puyoControllers[0].GetPuyoType());
-        Debug.Assert(is_set0);
-
-        bool is_set1 = boardController.Settle(CalcChildPuyoPos(_position,_rotate),
-            (int)_puyoControllers[1].GetPuyoType());
-        Debug.Assert(is_set1);
-
-        gameObject.SetActive(false);
+        Settle();
     }
 
     static readonly KeyCode[] key_code_tbl = new KeyCode[(int)LogicalInput.Key.Max] {
@@ -160,8 +179,40 @@ public class PlayerController : MonoBehaviour
         logicalInput.Update(inputDev);
     }
 
+    bool Fall(bool is_fast)
+    {
+        _fallCount -= is_fast ? FALL_COUNT_FAST_SPD : FALL_COUNT_SPD;
+        //ブロックを飛び越えたら、行けるのかチェック
+        while (_fallCount < 0) 
+        {
+            if (!CanMove(_position + Vector2Int.down, _rotate))
+            {
+                //落ちれないなら
+                _fallCount = 0;
+                if (0 < --_groundFrame) return true;
+
+                //時間切れになったら本当に固定
+                Settle();
+                return false;
+            }
+
+            //落ちれるなら下に進む
+            _position += Vector2Int.down;
+            _last_position += Vector2Int.down;
+            _fallCount += FALL_COUNT_UNIT;
+        }
+
+        return true;
+    }
+
     void Control()
     {
+        //落とす
+        if (!Fall(logicalInput.IsRaw(LogicalInput.Key.Down))) return;
+
+        //アニメ中はキー入力を受け付けない
+        if (_animationController.Update()) return;
+
         //平行移動のキー入力取得
         if (logicalInput.IsRepeat(LogicalInput.Key.Right))
         {
@@ -196,16 +247,16 @@ public class PlayerController : MonoBehaviour
         UpDateInput();
 
         //操作を受けて動かす
-        if(!_animationController.Update())
-        {
-            Control();
-        }
+        Control();
 
+        //表示
+        Vector3 dy = Vector3.up * (float)_fallCount / (float)FALL_COUNT_UNIT;
         float anim_rate = _animationController.GetNormalized();
-        _puyoControllers[0].SetPos(Interpolate(_position, RotState.Invalid, _last_position, RotState.Invalid, anim_rate));
-        _puyoControllers[1].SetPos(Interpolate(_position, _rotate, _last_position, _last_rotate, anim_rate));
+        _puyoControllers[0].SetPos(dy + Interpolate(_position, RotState.Invalid, _last_position, RotState.Invalid, anim_rate));
+        _puyoControllers[1].SetPos(dy + Interpolate(_position, _rotate, _last_position, _last_rotate, anim_rate));
     }
 
+    //rateが1->0で、pos_last->pos,rot->rotに遷移。rotがRotState.Invalidなら回転を考慮しない(軸ぷよ用)
     static Vector3 Interpolate(Vector2Int pos, RotState rot, Vector2Int pos_last, RotState rot_last, float rate)
     {
         //平行移動
@@ -220,6 +271,7 @@ public class PlayerController : MonoBehaviour
         float theta1 = 0.5f * Mathf.PI * (float)(int)rot_last;
         float theta = theta1 - theta0;
 
+        //近いほうに回る
         if (+Mathf.PI < theta) theta = theta - 2.0f * Mathf.PI;
         if (theta < -Mathf.PI) theta = theta + 2.0f * Mathf.PI;
 
