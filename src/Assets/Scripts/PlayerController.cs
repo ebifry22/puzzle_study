@@ -37,9 +37,6 @@ public class PlayerController : MonoBehaviour
         _puyoControllers[0].SetPuyoType(PuyoType.Green);
         _puyoControllers[1].SetPuyoType(PuyoType.Red);
 
-        _position = new Vector2Int(2, 12);
-        _rotate = RotState.Up;
-
         _puyoControllers[0].SetPos(new Vector3((float)_position.x, (float)_position.y, 0.0f));
         Vector2Int posChild = CalcChildPuyoPos(_position, _rotate);
         _puyoControllers[1].SetPos(new Vector3((float)posChild.x, (float)posChild.y, 0.0f));
