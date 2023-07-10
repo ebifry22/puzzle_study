@@ -155,30 +155,6 @@ public class PlayerController : MonoBehaviour
         Settle();
     }
 
-    static readonly KeyCode[] key_code_tbl = new KeyCode[(int)LogicalInput.Key.Max] {
-        KeyCode.RightArrow, //Right
-        KeyCode.LeftArrow,  //Left
-        KeyCode.X,          //RotR
-        KeyCode.Z,          //RotL
-        KeyCode.UpArrow,    //QuickDrop
-        KeyCode.DownArrow,  //Down
-    };
-
-    void UpDateInput()
-    {
-        LogicalInput.Key inputDev = 0;
-
-        for(int i=0;i<(int)LogicalInput.Key.Max;i++)
-        {
-            if (Input.GetKey(key_code_tbl[i]))
-            {
-                inputDev |= (LogicalInput.Key)(1 << i);
-            }
-        }
-
-        logicalInput.Update(inputDev);
-    }
-
     bool Fall(bool is_fast)
     {
         _fallCount -= is_fast ? FALL_COUNT_FAST_SPD : FALL_COUNT_SPD;
