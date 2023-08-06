@@ -17,12 +17,12 @@ public class PlayerController : MonoBehaviour
 
     enum RotState
     {
-        Up=0,
-        Right=1,
-        Down=2,
-        Left=3,
+        Up = 0,
+        Right = 1,
+        Down = 2,
+        Left = 3,
 
-        Invalid=-1,
+        Invalid = -1,
     }
 
     [SerializeField] PuyoController[] _puyoControllers = new PuyoController[2] { default!, default! };
@@ -42,6 +42,9 @@ public class PlayerController : MonoBehaviour
     int _fallCount = 0;
     int _groundFrame = GROUND_FRAMS;
 
+    //得点
+    uint _additiveScore = 0;
+
     // Start is called before the first frame update
     void Start()
     {
@@ -54,7 +57,7 @@ public class PlayerController : MonoBehaviour
     }
 
     //新しくぷよを出す
-    public bool Spawn(PuyoType axis,PuyoType Child)
+    public bool Spawn(PuyoType axis, PuyoType Child)
     {
         //初期位置に出せるか確認
         Vector2Int position = new Vector2Int(2, 12);
@@ -86,20 +89,20 @@ public class PlayerController : MonoBehaviour
         Vector2Int.up, Vector2Int.right,Vector2Int.down,Vector2Int.left
     };
 
-    private static Vector2Int CalcChildPuyoPos(Vector2Int pos,RotState rot)
+    private static Vector2Int CalcChildPuyoPos(Vector2Int pos, RotState rot)
     {
         return pos + rotate_tbl[(int)rot];
     }
 
     private bool CanMove(Vector2Int pos, RotState rot)
     {
-        if(!boardController.CanSettle(pos)) return false;
+        if (!boardController.CanSettle(pos)) return false;
         if (!boardController.CanSettle(CalcChildPuyoPos(pos, rot))) return false;
 
         return true;
     }
 
-    void SetTransition(Vector2Int pos,RotState rot,int time)
+    void SetTransition(Vector2Int pos, RotState rot, int time)
     {
         //補間のために保存
         _last_position = _position;
@@ -163,7 +166,7 @@ public class PlayerController : MonoBehaviour
 
     void Settle()
     {
-        //直接立地
+        //直接接地
         bool is_set0 = boardController.Settle(_position,
             (int)_puyoControllers[0].GetPuyoType());
         Debug.Assert(is_set0);
@@ -177,14 +180,14 @@ public class PlayerController : MonoBehaviour
 
     void QuickDrop()
     {
-        Vector2Int pos= _position;
+        Vector2Int pos = _position;
         do
         {
             pos += Vector2Int.down;
         } while (CanMove(pos, _rotate));
         pos -= Vector2Int.down;
 
-        _position= pos;
+        _position = pos;
 
         Settle();
     }
@@ -192,8 +195,9 @@ public class PlayerController : MonoBehaviour
     bool Fall(bool is_fast)
     {
         _fallCount -= is_fast ? FALL_COUNT_FAST_SPD : FALL_COUNT_SPD;
+
         //ブロックを飛び越えたら、行けるのかチェック
-        while (_fallCount < 0) 
+        while (_fallCount < 0)
         {
             if (!CanMove(_position + Vector2Int.down, _rotate))
             {
@@ -211,6 +215,8 @@ public class PlayerController : MonoBehaviour
             _last_position += Vector2Int.down;
             _fallCount += FALL_COUNT_UNIT;
         }
+
+        if (is_fast) _additiveScore++;//下に入れて落ちれるときはボーナス追加
 
         return true;
     }
@@ -285,5 +291,14 @@ public class PlayerController : MonoBehaviour
         theta = theta0 + rate * theta;
 
         return p + new Vector3(Mathf.Sin(theta), Mathf.Cos(theta), 0.0f);
+    }
+
+    //得点の受け渡し
+    public uint popScore()
+    {
+        uint score = _additiveScore;
+        _additiveScore = 0;
+
+        return score;
     }
 }

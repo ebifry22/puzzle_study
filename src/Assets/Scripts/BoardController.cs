@@ -24,7 +24,9 @@ public class BoardController : MonoBehaviour
     [SerializeField] GameObject prefabPuyo = default!;
 
     int[,] _board = new int[BOARD_HEIGHT, BOARD_WIDTH];
-    GameObject[,] _Puyos=new GameObject[BOARD_HEIGHT, BOARD_WIDTH];
+    GameObject[,] _Puyos = new GameObject[BOARD_HEIGHT, BOARD_WIDTH];
+
+    uint _additiveScore = 0;
 
     //落ちる際の一時的変数
     List<FallData> _falls = new();
@@ -36,9 +38,9 @@ public class BoardController : MonoBehaviour
 
     private void ClearAll()
     {
-        for(int y=0;y<BOARD_HEIGHT;y++)
+        for (int y = 0; y < BOARD_HEIGHT; y++)
         {
-            for(int x=0;x<BOARD_WIDTH;x++)
+            for (int x = 0; x < BOARD_WIDTH; x++)
             {
                 _board[y, x] = 0;
 
@@ -55,20 +57,20 @@ public class BoardController : MonoBehaviour
 
     public static bool IsValidated(Vector2Int pos)
     {
-        return 0<=pos.x&&pos.x<BOARD_WIDTH
-            &&0<=pos.y&&pos.y<BOARD_HEIGHT;
+        return 0 <= pos.x && pos.x < BOARD_WIDTH
+            && 0 <= pos.y && pos.y < BOARD_HEIGHT;
     }
 
     public bool CanSettle(Vector2Int pos)
     {
-        if(!IsValidated(pos)) return false;
+        if (!IsValidated(pos)) return false;
 
         return 0 == _board[pos.y, pos.x];
     }
 
     public bool Settle(Vector2Int pos, int val)
     {
-        if(!CanSettle(pos)) return false;
+        if (!CanSettle(pos)) return false;
 
         _board[pos.y, pos.x] = val;
 
@@ -79,7 +81,7 @@ public class BoardController : MonoBehaviour
 
         return true;
     }
-    
+
     //下が空間になっていて落ちるぷよを検索する
     public bool CheckFall()
     {
@@ -142,14 +144,34 @@ public class BoardController : MonoBehaviour
         return _falls.Count != 0;
     }
 
+    //ボーナス計算用のテーブル
+    static readonly uint[] chainBounusTbl = new uint[] {
+        0,8,16,32,64,
+        96,128,160,192,224,
+        256,288,320,352,384,
+        416,448,480,512 };
+
+    static readonly uint[] connectBonusTbl = new uint[] {
+        0,0,0,0,0,2,3,4,5,6,7,
+    };
+
+    static readonly uint[] colorBonusTbl = new uint[] {
+        0,3,6,12,24,
+    };
+
     static readonly Vector2Int[] search_tbl = new Vector2Int[] { Vector2Int.up, Vector2Int.right, Vector2Int.down, Vector2Int.left };
     //消えるぷよを検索する(同じ色を上下左右に見つけていく。見つけたらフラグを立てて再計算しない)
-    public bool CheckErase()
+    public bool CheckErase(int chainCount)
     {
         _eraseFrames = 0;
         _erases.Clear();
 
         uint[] isChecked = new uint[BOARD_HEIGHT];//メモリを多く使うのは無駄なので、ビット処理
+
+        //得点計算用
+        int puyoCount = 0;
+        uint colorBits = 0;
+        uint connectBonus = 0;
 
         List<Vector2Int> add_list = new();
         for (int y = 0; y < BOARD_HEIGHT; y++)
@@ -162,6 +184,8 @@ public class BoardController : MonoBehaviour
 
                 int type = _board[y, x];
                 if (type == 0) continue;//空間だった
+
+                puyoCount++;
 
                 System.Action<Vector2Int> get_connection = null;//再帰で使う場合に必要
                 get_connection = (pos) =>
@@ -186,9 +210,28 @@ public class BoardController : MonoBehaviour
 
                 if (4 <= add_list.Count)
                 {
+                    connectBonus += colorBonusTbl[System.Math.Min(add_list.Count, colorBonusTbl.Length - 1)];
+                    colorBits |= (1u << type);
                     _erases.AddRange(add_list);
                 }
             }
+        }
+
+        if (chainCount != -1)//初期化時は計算しない
+        {
+            //ボーナス計算
+            uint colorNum = 0;
+            for (; 0 < colorBits; colorBits >>= 1)//立っているビットの数を数える
+            {
+                colorNum += (colorBits & 1u);
+            }
+
+            uint colorBonus = colorBonusTbl[System.Math.Min(colorNum, colorBonusTbl.Length - 1)];
+            uint chainBonus = chainBounusTbl[System.Math.Min(chainCount, chainBounusTbl.Length - 1)];
+            uint bonus = System.Math.Max(1, chainBonus + colorBonus + colorBonus);//0の時も1入れる
+            _additiveScore += 10 * (uint)_erases.Count * bonus;
+
+            if (puyoCount == 0) _additiveScore += 1800;//全消しボーナス
         }
         return _erases.Count != 0;
     }
@@ -205,7 +248,7 @@ public class BoardController : MonoBehaviour
         if (t <= 0.0f)
         {
             //データとゲームオブジェクトをここで消す
-            foreach(Vector2Int d in _erases)
+            foreach (Vector2Int d in _erases)
             {
                 Destroy(_Puyos[d.y, d.x]);
                 _Puyos[d.y, d.x] = null;
@@ -221,5 +264,14 @@ public class BoardController : MonoBehaviour
         }
 
         return true;
+    }
+
+    //得点の受け渡し
+    public uint popScore()
+    {
+        uint score = _additiveScore;
+        _additiveScore = 0;
+
+        return score;
     }
 }

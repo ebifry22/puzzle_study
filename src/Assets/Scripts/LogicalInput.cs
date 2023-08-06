@@ -15,7 +15,7 @@ public class LogicalInput
         QuickDrop=1<<4,
         Down=1<<5,
 
-        Max=6,
+        MAX=6,
     }
 
     const int KEY_REPEAT_START_TIME = 12;
@@ -25,7 +25,7 @@ public class LogicalInput
     Key inputTrg;
     Key inputRel;
     Key inputRep;
-    int[] _trgWaitingTime = new int[(int)Key.Max];
+    int[] _trgWaitingTime = new int[(int)Key.MAX];
 
     public bool IsRaw(Key K)
     {
@@ -50,7 +50,7 @@ public class LogicalInput
         inputTrg = 0;
         inputRel = 0;
         inputRep = 0;
-        for(int i=0;i<(int)Key.Max;i++)
+        for(int i=0;i<(int)Key.MAX;i++)
         {
             _trgWaitingTime[i] = 0;
         }
@@ -68,7 +68,7 @@ public class LogicalInput
 
         //キーリピートの生成
         inputRep = 0;
-        for(int i=0;i<(int)Key.Max;i++)
+        for(int i=0;i<(int)Key.MAX;i++)
         {
             if(inputTrg.HasFlag((Key)(1<<i)))
             {
